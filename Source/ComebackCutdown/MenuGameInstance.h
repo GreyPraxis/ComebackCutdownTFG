@@ -31,10 +31,15 @@ public:
 		ECharacterClass characterClass;
 
 	// A futuro añadir aquí selección de colores
-	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
-	//	FVector textureEdit1;
-	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
-	//	FVector textureEdit2;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
+		bool edit1Set;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
+		FVector textureEdit1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
+		bool edit2Set;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
+		FVector textureEdit2;
 	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
 	//	FVector textureEdit3;
 };

@@ -16,7 +16,7 @@ enum class EDirectionalInput : uint8
 
 	VE_LookingUp	UMETA(DisplayName = "LOOKING_UP"),
 	VE_Default		UMETA(DisplayName = "NOT_LOOKING"),
-	VE_Crouching	UMETA(DisplayName = "CROUCHING")
+	VE_LookingDown	UMETA(DisplayName = "LOOKING_DOWN")
 };
 
 UENUM(BlueprintType)
@@ -27,6 +27,7 @@ enum class ECharacterState : uint8
 	E_RunningRight		UMETA(DisplayName = "RUNNING_RIGHT"),
 	E_MovingLeft			UMETA(DisplayName = "MOVING_LEFT"),
 	E_RunningLeft		UMETA(DisplayName = "RUNNING_LEFT"),
+	E_Crouching		UMETA(DisplayName = "CROUCH"),
 	E_Jumping		UMETA(DisplayName = "JUMPING"),
 	E_Block		UMETA(DisplayName = "BLOCKING"),
 	E_Stunned		UMETA(DisplayName = "STUNNED"),
@@ -34,6 +35,54 @@ enum class ECharacterState : uint8
 	//E_CrouchBlock		UMETA(DisplayName = "CROUCH_BLOCKING"),
 	E_Dead		UMETA(DisplayName = "DEAD")
 };
+/*
+UENUM(BlueprintType)
+enum class EInputType : uint8
+{
+	E_None			UMETA(DisplayName = "NONE"),
+	E_Left			UMETA(DisplayName = "LEFT"),
+	E_Right			UMETA(DisplayName = "RIGHT"),
+	E_Up			UMETA(DisplayName = "UP"),
+	E_Down			UMETA(DisplayName = "DOWN"),
+	E_Jump			UMETA(DisplayName = "JUMP"),
+	E_Block			UMETA(DisplayName = "BLOCK"),
+	E_WeakAttack	UMETA(DisplayName = "WEAK_ATTACK"),
+	E_NormalAttack	UMETA(DisplayName = "NORMAL_ATTACK"),
+	E_SpecialAttack	UMETA(DisplayName = "SPECIAL_ATTACK"),
+	E_StrongAttack	UMETA(DisplayName = "STRONG_ATTACK"),
+	E_Throw			UMETA(DisplayName = "THROW"),
+	E_ExAttack		UMETA(DisplayName = "SUPER_ATTACK")
+};
+
+UENUM(BlueprintType)
+enum class EInputStatus : uint8
+{
+	E_None			UMETA(DisplayName = "NONE"),
+	E_Press			UMETA(DisplayName = "PRESS"),
+	E_Release			UMETA(DisplayName = "RELEASE"),
+	E_Hold			UMETA(DisplayName = "HOLD")
+};
+
+USTRUCT(BlueprintType)
+struct FInputInfo
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+		EInputType inputType;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+		EInputStatus inputStatus;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+		int64 frame;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+		bool wasUsed;
+
+};*/
+
 
 UCLASS(config=Game)
 class AComebackCutdownCharacter : public ACharacter
@@ -55,8 +104,16 @@ class AComebackCutdownCharacter : public ACharacter
 		void AttackNormal();
 	UFUNCTION(BlueprintCallable)
 		void AttackSpecial();
-	//UFUNCTION(BlueprintCallable)
-	//	void AttackStrong(); //Tilt+Boton instantaneo o Joystick derecho (configurable)
+	UFUNCTION(BlueprintCallable)
+		void AttackSpecialRelease();
+	UFUNCTION(BlueprintCallable)
+		void AttackStrong(); //Tilt+Boton instantaneo o Joystick derecho (configurable)
+	void AttackStrongW();
+	void AttackStrongN();
+	UFUNCTION(BlueprintCallable)
+		void AttackStrongRelease();
+	void AttackStrongReleaseW();
+	void AttackStrongReleaseN();
 
 	// Keyboard-Only mode multiplayer
 	//UFUNCTION(BlueprintCallable)
@@ -94,6 +151,25 @@ protected:
 	//Player used a normal attack?
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attacks")
 		bool wasNormalAttackUsed;
+	//Player used a special attack?
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attacks")
+		bool wasSpecialAttackUsed;
+	//Player used a strong attack?
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attacks")
+		bool wasStrongAttackUsed;
+
+	//Player used a special attack?
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attacks")
+		bool isCharging;
+
+	bool weakHeld;
+	bool normalHeld;
+
+	// Maximum allowed time to charge a strong attack
+	float maxInputHoldTime;
+
+	// Timer handle used to track how long strong attacks were held
+	FTimerHandle inputHeldTimer;
 
 
 	//Saltos
@@ -115,6 +191,11 @@ protected:
 	void MoveRightController(float Val);
 	void UpDownController(float Val);
 
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
+		float timeDirectionalXInputWasHeld;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
+		float timeDirectionalYInputWasHeld;
 
 	//Antigua revisión de salto
 	/** Handle touch inputs. */
@@ -148,6 +229,10 @@ protected:
 	UFUNCTION(BlueprintCallable)
 		void HandleLaunch(float _launch, float _angel);
 
+	// Move a character off of another hurtbox/collider smoothly
+	UFUNCTION(BlueprintImplementableEvent)
+		void MoveCharacterSmoothly(FVector _start, FVector _end);
+
 
 	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
 	//	ECharacterClass characterClass;
@@ -159,6 +244,8 @@ protected:
 		float currentPlayerHealth;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player")
 		int playerNumber;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player")
+		AComebackCutdownCharacter* otherPlayer;
 
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
@@ -197,10 +284,24 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sprint")
 		float MinReleaseTime;
 
+
+	// for charging moves
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ChargeMoves")
+		bool chargingSpecial;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ChargeMoves")
+		bool chargingStrong;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ChargeMoves")
+		float timeChargingSpecial;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ChargeMoves")
+		float timeChargingStrong;
+
 	// stunTimer from taking damage
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stun")
 		float timeStunned;
 
+	// stunTime from getting the shield hit
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block")
+		float blockStun;
 	// stunTime from getting the shield pierced
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block")
 		float blockShieldBreakStunFrames;

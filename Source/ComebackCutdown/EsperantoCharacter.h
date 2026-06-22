@@ -17,6 +17,8 @@ class COMEBACKCUTDOWN_API AEsperantoCharacter : public AComebackCutdownCharacter
 
 	//void AttackWeak() override;
 	//void AttackNormal() override;
+	//void AttackSpecial() override;
+	//void AttackSpecialRelease();
 
 protected: 
 

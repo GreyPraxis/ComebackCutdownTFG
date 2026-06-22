@@ -75,6 +75,12 @@ AComebackCutdownCharacter::AComebackCutdownCharacter()
 	MinReleaseTime = 0.1f;
 	stopRunTime = 0.0f;
 
+
+	timeChargingSpecial = 0.0f;
+	chargingStrong = false;
+	timeChargingSpecial = 0.0f;
+	chargingSpecial = false;
+
 	timeStunned = 0.0f;
 
 	blockShieldBreakStunFrames = 150.0f;
@@ -82,7 +88,18 @@ AComebackCutdownCharacter::AComebackCutdownCharacter()
 	cantMove = false;
 	wasWeakAttackUsed = false;
 	wasNormalAttackUsed = false;
+	wasSpecialAttackUsed = false;
 	canAttack = true;
+
+	weakHeld = false;
+	normalHeld = false;
+
+	//Strong attack stuff
+	isCharging = false;
+	maxInputHoldTime = 3.0f;
+
+	timeDirectionalXInputWasHeld = 0.0f;
+	timeDirectionalYInputWasHeld = 0.0f;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -90,18 +107,18 @@ AComebackCutdownCharacter::AComebackCutdownCharacter()
 
 void AComebackCutdownCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
 {
-	if (isDeviceForMultiplePlayers) {
+	/*if (isDeviceForMultiplePlayers) {
 		if (auto gameMode = Cast<AComebackCutdownGameMode>(GetWorld()->GetAuthGameMode())) {
 
 			if (gameMode->player1 == this) {
 				PlayerInputComponent->BindAxis("MoveRight", this, &AComebackCutdownCharacter::MoveRight);
 				PlayerInputComponent->BindAxis("UpDown", this, &AComebackCutdownCharacter::UpDown);
 			}
-			/*else //Player 2 inputs
+			else //Player 2 inputs
 			{
 				PlayerInputComponent->BindAxis("MoveRightP2", this, &AComebackCutdownCharacter::MoveRight);
 				PlayerInputComponent->BindAxis("UpDownP2", this, &AComebackCutdownCharacter::UpDown);
-			}*/
+			}
 
 			PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &AComebackCutdownCharacter::StartJump);
 			PlayerInputComponent->BindAction("Jump", IE_Released, this, &AComebackCutdownCharacter::StopJump);
@@ -117,10 +134,17 @@ void AComebackCutdownCharacter::SetupPlayerInputComponent(class UInputComponent*
 			PlayerInputComponent->BindAction("AttackWeak", IE_Pressed, this, &AComebackCutdownCharacter::AttackWeak);
 			PlayerInputComponent->BindAction("AttackNormal", IE_Pressed, this, &AComebackCutdownCharacter::AttackNormal);
 			PlayerInputComponent->BindAction("AttackSpecial", IE_Pressed, this, &AComebackCutdownCharacter::AttackSpecial);
+			PlayerInputComponent->BindAction("AttackSpecial", IE_Released, this, &AComebackCutdownCharacter::AttackSpecialRelease);
+
+			//Strongs
+			PlayerInputComponent->BindAction("AttackWeak", IE_Pressed, this, &AComebackCutdownCharacter::AttackStrongW);
+			PlayerInputComponent->BindAction("AttackNormal", IE_Pressed, this, &AComebackCutdownCharacter::AttackStrongN);
+			PlayerInputComponent->BindAction("AttackWeak", IE_Released, this, &AComebackCutdownCharacter::AttackStrongRelease);
+			PlayerInputComponent->BindAction("AttackNormal", IE_Released, this, &AComebackCutdownCharacter::AttackStrongRelease);
 		}
-	}
+	}*/
 	// set up gameplay key bindings
-	else {
+	//else {
 
 		PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &AComebackCutdownCharacter::StartJump);
 		PlayerInputComponent->BindAction("Jump", IE_Released, this, &AComebackCutdownCharacter::StopJump);
@@ -139,9 +163,16 @@ void AComebackCutdownCharacter::SetupPlayerInputComponent(class UInputComponent*
 		PlayerInputComponent->BindAction("AttackWeak", IE_Pressed, this, &AComebackCutdownCharacter::AttackWeak);
 		PlayerInputComponent->BindAction("AttackNormal", IE_Pressed, this, &AComebackCutdownCharacter::AttackNormal);
 		PlayerInputComponent->BindAction("AttackSpecial", IE_Pressed, this, &AComebackCutdownCharacter::AttackSpecial);
+		PlayerInputComponent->BindAction("AttackSpecial", IE_Released, this, &AComebackCutdownCharacter::AttackSpecialRelease);
+
+		//Strongs
+		PlayerInputComponent->BindAction("AttackWeak", IE_Pressed, this, &AComebackCutdownCharacter::AttackStrongW);
+		PlayerInputComponent->BindAction("AttackNormal", IE_Pressed, this, &AComebackCutdownCharacter::AttackStrongN);
+		PlayerInputComponent->BindAction("AttackWeak", IE_Released, this, &AComebackCutdownCharacter::AttackStrongRelease);
+		PlayerInputComponent->BindAction("AttackNormal", IE_Released, this, &AComebackCutdownCharacter::AttackStrongRelease);
 
 
-	}
+	//}
 
 	// Antiguo codigo de salto
 	//PlayerInputComponent->BindTouch(IE_Pressed, this, &AComebackCutdownCharacter::TouchStarted);
@@ -168,6 +199,7 @@ void AComebackCutdownCharacter::MoveRight(float Value)
 				isRunning = true;
 				stopRunTime = 0.1f;
 			}
+			if (directionalInputLeftRight != EDirectionalInput::VE_MovingRight) timeDirectionalXInputWasHeld = 0.0f;
 			directionalInputLeftRight = EDirectionalInput::VE_MovingRight;
 			LastTapDirection = directionalInputLeftRight;
 
@@ -182,7 +214,9 @@ void AComebackCutdownCharacter::MoveRight(float Value)
 				UE_LOG(LogTemp, Warning, TEXT("CorreIzq"));
 				isRunning = true;
 				stopRunTime = 0.1f;
-			}
+			}			
+			if (directionalInputLeftRight != EDirectionalInput::VE_MovingLeft) timeDirectionalXInputWasHeld = 0.0f;
+
 			directionalInputLeftRight = EDirectionalInput::VE_MovingLeft;
 			LastTapDirection = directionalInputLeftRight;
 
@@ -219,9 +253,11 @@ void AComebackCutdownCharacter::MoveRight(float Value)
 				}
 			}
 			if (isRunning) {
-				AddMovementInput(FVector(0.f, -1.f, 0.f), Value);
+				//UE_LOG(LogTemp, Warning, TEXT("Moves %f"), Value);
+				AddMovementInput(FVector(0.f, -1.f, 0.f), Value / fabs(Value));
 			}
 			else {
+				//UE_LOG(LogTemp, Warning, TEXT("Runs %f"), Value);
 				AddMovementInput(FVector(0.f, -0.8f, 0.f), Value);
 
 			}
@@ -246,6 +282,8 @@ void AComebackCutdownCharacter::MoveRightController(float Value)
 				isRunning = true;
 				stopRunTime = 0.1f;
 			}
+			if (directionalInputLeftRight != EDirectionalInput::VE_MovingRight) timeDirectionalXInputWasHeld = 0.0f;
+
 			directionalInputLeftRight = EDirectionalInput::VE_MovingRight;
 			LastTapDirection = directionalInputLeftRight;
 
@@ -261,7 +299,10 @@ void AComebackCutdownCharacter::MoveRightController(float Value)
 				isRunning = true;
 				stopRunTime = 0.1f;
 			}
+			if (directionalInputLeftRight != EDirectionalInput::VE_MovingLeft) timeDirectionalXInputWasHeld = 0.0f;
+
 			directionalInputLeftRight = EDirectionalInput::VE_MovingLeft;
+			timeDirectionalXInputWasHeld = 0.0f;
 			LastTapDirection = directionalInputLeftRight;
 
 			LastTapTime = CurrentTime;
@@ -282,6 +323,8 @@ void AComebackCutdownCharacter::MoveRightController(float Value)
 			isRunning = false;
 			UE_LOG(LogTemp, Warning, TEXT("ParaCorrer"));
 		}
+
+		UE_LOG(LogTemp, Warning, TEXT("Moves %f"), Value);
 		// add movement in that direction
 		if (!cantMove && characterState != ECharacterState::E_Block && characterState != ECharacterState::E_Stunned) {
 			if (!GetCharacterMovement()->IsFalling()) {
@@ -297,7 +340,8 @@ void AComebackCutdownCharacter::MoveRightController(float Value)
 				}
 			}
 			if (isRunning) {
-				AddMovementInput(FVector(0.f, -1.f, 0.f), Value);
+
+				AddMovementInput(FVector(0.f, -1.f, 0.f), Value/fabs(Value));
 			}
 			else {
 				AddMovementInput(FVector(0.f, -0.8f, 0.f), Value);
@@ -312,14 +356,27 @@ void AComebackCutdownCharacter::UpDown(float Value)
 {
 	if (isDeviceForMultiplePlayers) {
 		if (Value > 0.20f) {//Provisional, revisar
+			if (directionalInputUpDown != EDirectionalInput::VE_LookingUp) timeDirectionalYInputWasHeld = 0.0f;
+
 			directionalInputUpDown = EDirectionalInput::VE_LookingUp;
+
+			//if (!GetCharacterMovement()->IsFalling()) {
+			//	characterState = ECharacterState::E_Idle;
+			//}
 		}
 		else if (Value < -0.20f) {//Provisional, revisar
-			directionalInputUpDown = EDirectionalInput::VE_Crouching;
+			if (directionalInputUpDown != EDirectionalInput::VE_LookingDown) timeDirectionalYInputWasHeld = 0.0f;
+			directionalInputUpDown = EDirectionalInput::VE_LookingDown;
 			//Crouch
+			//if (!GetCharacterMovement()->IsFalling()) {
+			//	characterState = ECharacterState::E_Crouching;
+			//}
 		}
 		else {//Provisional, revisar
 			directionalInputUpDown = EDirectionalInput::VE_Default;
+			//if (!GetCharacterMovement()->IsFalling()) {
+			//	characterState = ECharacterState::E_Idle;
+			//}
 		}
 		yStrong = Value;
 	}
@@ -329,14 +386,27 @@ void AComebackCutdownCharacter::UpDownController(float Value)
 {
 	if (!isDeviceForMultiplePlayers) {
 		if (Value > 0.20f) {//Provisional, revisar
+			if (directionalInputUpDown != EDirectionalInput::VE_LookingUp) timeDirectionalYInputWasHeld = 0.0f;
+
 			directionalInputUpDown = EDirectionalInput::VE_LookingUp;
+
+			//if (!GetCharacterMovement()->IsFalling()) {
+			//	characterState = ECharacterState::E_Idle;
+			//}
 		}
 		else if (Value < -0.20f) {//Provisional, revisar
-			directionalInputUpDown = EDirectionalInput::VE_Crouching;
+			if (directionalInputUpDown != EDirectionalInput::VE_LookingDown) timeDirectionalYInputWasHeld = 0.0f;
+			directionalInputUpDown = EDirectionalInput::VE_LookingDown;
 			//Crouch
+			//if (!GetCharacterMovement()->IsFalling()) {
+			//	characterState = ECharacterState::E_Crouching;
+
 		}
 		else {//Provisional, revisar
 			directionalInputUpDown = EDirectionalInput::VE_Default;
+			//if (!GetCharacterMovement()->IsFalling()) {
+			//	characterState = ECharacterState::E_Idle;
+			//}
 		}
 		yStrong = Value;
 	}
@@ -347,6 +417,41 @@ void AComebackCutdownCharacter::Landed(const FHitResult& Hit) {
 
 	// Resetear numero de saltos
 	jumpCount = 0;
+
+	if (characterState == ECharacterState::E_Jumping)
+	{
+		if (otherPlayer && Hit.Actor.Get() == otherPlayer) 
+		{
+			if (otherPlayer->isFacingRight)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("A character has landed on top of another (offset to the right)"));
+				UE_LOG(LogTemp, Warning, TEXT("Landing character u-location: %f"), GetActorLocation().Y);
+				UE_LOG(LogTemp, Warning, TEXT("Landed-on character u-location: %f"), otherPlayer->GetActorLocation().Y);
+				MoveCharacterSmoothly(GetActorLocation(), FVector(GetActorLocation().X, GetActorLocation().Y + (120 - fabs(GetActorLocation().Y - otherPlayer->GetActorLocation().Y)), GetActorLocation().Z - 80.0f));
+				otherPlayer->MoveCharacterSmoothly(otherPlayer->GetActorLocation(), FVector(otherPlayer->GetActorLocation().X, otherPlayer->GetActorLocation().Y + (120 - fabs(otherPlayer->GetActorLocation().Y - GetActorLocation().Y)), otherPlayer->GetActorLocation().Z));
+				//otherPlayer->MoveCharacterSmoothly(FVector(0.0f, 0.0f, 0.0f), FVector(0.0f, 50.0f, 0.0f));
+			}
+			else 
+			{
+				UE_LOG(LogTemp, Warning, TEXT("A character has landed on top of another (offset to the left)"));
+				UE_LOG(LogTemp, Warning, TEXT("Landing character u-location: %f"), GetActorLocation().Y);
+				UE_LOG(LogTemp, Warning, TEXT("Landed-on character u-location: %f"), otherPlayer->GetActorLocation().Y);
+				MoveCharacterSmoothly(GetActorLocation(), FVector(GetActorLocation().X, GetActorLocation().Y + (120 - fabs(GetActorLocation().Y - otherPlayer->GetActorLocation().Y)) * -1.0f, GetActorLocation().Z - 80.0f));
+				otherPlayer->MoveCharacterSmoothly(otherPlayer->GetActorLocation(), FVector(otherPlayer->GetActorLocation().X, otherPlayer->GetActorLocation().Y + (120 - fabs(otherPlayer->GetActorLocation().Y - GetActorLocation().Y)) * -1.0f, otherPlayer->GetActorLocation().Z));
+				//otherPlayer->MoveCharacterSmoothly(FVector(0.0f,0.0f,0.0f), FVector(0.0f, -50.0f, 0.0f));
+			}
+			//GetCharacterMovement()->GravityScale = defaultGravityScale;
+			//gravityScaleModifier = 0.9f;
+		}/*
+		else if (!Cast<AHitboxActor>(Hit.Actor.Get()))
+		{
+			//GetCharacterMovement()->GravityScale = defaultGravityScale;
+			//gravityScaleModifier = 0.9f;
+			characterState = ECharacterState::E_Idle;
+		}*/
+	}
+
+	characterState = ECharacterState::E_Idle;
 }
 
 void AComebackCutdownCharacter::StartJump()
@@ -362,6 +467,7 @@ void AComebackCutdownCharacter::StartJump()
 	if (!cantMove && characterState != ECharacterState::E_Dead 
 		&& characterState != ECharacterState::E_Stunned) {
 		ACharacter::Jump();
+		characterState = ECharacterState::E_Jumping;
 	}
 	isRunning = false;
 }
@@ -379,12 +485,17 @@ void AComebackCutdownCharacter::AttackWeak() {
 
 	UE_LOG(LogTemp, Warning, TEXT("Ataque debil"));
 	//Revisar direccionalidad y aire/suelo
-	if (canAttack == true && !cantMove && characterState != ECharacterState::E_Dead
+	/*if (canAttack == true && !cantMove && characterState != ECharacterState::E_Dead
 		&& characterState != ECharacterState::E_Stunned
 		&& characterState != ECharacterState::E_Block) {
 		wasWeakAttackUsed = true;
 		canAttack = false;
 		cantMove = true;
+	}*/
+	if (characterState != ECharacterState::E_Dead
+		&& characterState != ECharacterState::E_Stunned
+		&& characterState != ECharacterState::E_Block) {
+		wasWeakAttackUsed = true;
 	}
 
 
@@ -430,12 +541,17 @@ void AComebackCutdownCharacter::AttackNormal() {
 	UE_LOG(LogTemp, Warning, TEXT("Ataque normal"));
 
 	//Revisar direccionalidad y aire/suelo
-	if (canAttack == true && !cantMove && characterState != ECharacterState::E_Dead
+	/*if (canAttack == true && !cantMove && characterState != ECharacterState::E_Dead
 		&& characterState != ECharacterState::E_Stunned
 		&& characterState != ECharacterState::E_Block) {
 		wasNormalAttackUsed = true;
 		canAttack = false;
 		cantMove = true;
+	}*/
+	if (characterState != ECharacterState::E_Dead
+		&& characterState != ECharacterState::E_Stunned
+		&& characterState != ECharacterState::E_Block) {
+		wasNormalAttackUsed = true;
 	}
 
 
@@ -481,7 +597,18 @@ void AComebackCutdownCharacter::AttackNormal() {
 void AComebackCutdownCharacter::AttackSpecial() {
 	UE_LOG(LogTemp, Warning, TEXT("Ataque especial"));
 
+	// Charging moves
+	timeChargingSpecial = 0.0f;
+	chargingSpecial = true;
+
 	//Revisar direccionalidad y aire/suelo
+	if (canAttack == true && !cantMove && characterState != ECharacterState::E_Dead
+		&& characterState != ECharacterState::E_Stunned
+		&& characterState != ECharacterState::E_Block) {
+		wasSpecialAttackUsed = true;
+		//canAttack = false;
+		//cantMove = true;
+	}
 
 
 	if (GetCharacterMovement()->IsMovingOnGround()) { //En suelo
@@ -521,9 +648,39 @@ void AComebackCutdownCharacter::AttackSpecial() {
 	}
 
 }
-/*
+
+
+
+void AComebackCutdownCharacter::AttackSpecialRelease() {
+	chargingSpecial = false;
+}
+
+
+void AComebackCutdownCharacter::AttackStrongW() {
+	if (!normalHeld && ((directionalInputLeftRight!=EDirectionalInput::VE_Neutral && timeDirectionalXInputWasHeld < 0.1f) || (directionalInputUpDown != EDirectionalInput::VE_Default && timeDirectionalYInputWasHeld < 0.1f))) {
+		weakHeld = true;
+		AttackStrong();
+	}
+}
+void AComebackCutdownCharacter::AttackStrongN() {
+	if (!weakHeld && ((directionalInputLeftRight != EDirectionalInput::VE_Neutral && timeDirectionalXInputWasHeld < 0.1f) || (directionalInputUpDown != EDirectionalInput::VE_Default && timeDirectionalYInputWasHeld < 0.1f))) {
+		normalHeld = true;
+		AttackStrong();
+	}
+}
+
 void AComebackCutdownCharacter::AttackStrong() {
 	UE_LOG(LogTemp, Warning, TEXT("Ataque fuerte"));
+
+	if (!chargingStrong)
+	{
+		timeChargingStrong = 0.0f;
+		wasStrongAttackUsed = true;
+		chargingStrong = true;
+		GetWorld()->GetTimerManager().SetTimer(inputHeldTimer, this, &AComebackCutdownCharacter::AttackStrongRelease, maxInputHoldTime, false);
+	}
+
+
 
 	if (abs(xStrong) >= abs(yStrong)) {
 		if (xStrong > 0.00f) {
@@ -538,7 +695,30 @@ void AComebackCutdownCharacter::AttackStrong() {
 		else UE_LOG(LogTemp, Warning, TEXT("downstrong"));
 	}
 }
-*/ 
+
+void AComebackCutdownCharacter::AttackStrongReleaseW() {
+	if (!normalHeld) {
+		AttackStrongRelease();
+	}
+}
+
+void AComebackCutdownCharacter::AttackStrongReleaseN() {
+	if (!weakHeld) {
+		AttackStrongRelease();
+	}
+}
+
+void AComebackCutdownCharacter::AttackStrongRelease() {
+	if (weakHeld)
+	UE_LOG(LogTemp, Warning, TEXT("Ataque fuerte"));
+
+	if (chargingStrong){
+		wasStrongAttackUsed = true;
+		chargingStrong = false;
+		timeChargingStrong = GetWorld()->GetTimerManager().GetTimerElapsed(inputHeldTimer);
+	}
+}
+
 
 void AComebackCutdownCharacter::StartBlocking() {
 	if (characterState != ECharacterState::E_Dead
@@ -614,7 +794,8 @@ void AComebackCutdownCharacter::TakeDamage(float _damageAmount,
 
 	}
 	else { //If blocking, handle launch only in X axis
-		//(cosf(_angel)*_launch/2) = Launch distance in X / 2
+		//(cosf(_angel)*_launch/4) = Launch distance in X / 4
+		blockStun = stuntime / 2;
 		if (_shouldLaunchMatchCharacterDirection)
 		{
 			// If there is an owner/creator of the hitbox
@@ -625,11 +806,11 @@ void AComebackCutdownCharacter::TakeDamage(float _damageAmount,
 				{
 					if (owningCharacter->isFacingRight)
 					{
-						HandleLaunch(cosf(_angel) * _launch / 2, acos(-1.0));// invert x-axis launch angle
+						HandleLaunch(cosf(_angel) * _launch / 4, acos(-1.0));// invert x-axis launch angle
 					}
 					else
 					{
-						HandleLaunch(cosf(_angel) * _launch / 3, 0);
+						HandleLaunch(cosf(_angel) * _launch / 4, 0);
 					}
 				}
 			}
@@ -637,11 +818,11 @@ void AComebackCutdownCharacter::TakeDamage(float _damageAmount,
 			{
 				if (!isFacingRight)
 				{
-					HandleLaunch(cosf(_angel) * _launch / 2, acos(-1.0));
+					HandleLaunch(cosf(_angel) * _launch / 4, acos(-1.0));
 				}
 				else
 				{
-					HandleLaunch(cosf(_angel) * _launch / 2, 0); // invert x-axis launch angle
+					HandleLaunch(cosf(_angel) * _launch / 4, 0); // invert x-axis launch angle
 				}
 			}
 		}
@@ -649,11 +830,11 @@ void AComebackCutdownCharacter::TakeDamage(float _damageAmount,
 		{
 			if (GetActorLocation().Y >= _hitLocation.Y)
 			{
-				HandleLaunch(cosf(_angel) * _launch / 2, acos(-1.0));
+				HandleLaunch(cosf(_angel) * _launch / 4, acos(-1.0));
 			}
 			else
 			{
-				HandleLaunch(cosf(_angel) * _launch / 2, 0); // invert x-axis launch angle
+				HandleLaunch(cosf(_angel) * _launch / 4, 0); // invert x-axis launch angle
 			}
 		}
 
@@ -683,11 +864,30 @@ void AComebackCutdownCharacter::Tick(float DeltaTime)
 	if (stopRunTime > 0) {
 		stopRunTime -= DeltaTime;
 	}
+	if (blockStun > 0) {
+		blockStun -= DeltaTime;
+	}
 	if (timeStunned > 0) {
 		timeStunned -= DeltaTime;
 		if (timeStunned <= 0) {
 			characterState = ECharacterState::E_Idle;
 		}
+	}
+	if (chargingSpecial)
+	{
+		timeChargingSpecial += DeltaTime;
+	}
+	if (chargingStrong)
+	{
+		timeChargingStrong += DeltaTime;
+	}
+	if (directionalInputLeftRight != EDirectionalInput::VE_Neutral)
+	{
+		timeDirectionalXInputWasHeld += DeltaTime;
+	}
+	if (directionalInputUpDown != EDirectionalInput::VE_Default)
+	{
+		timeDirectionalYInputWasHeld += DeltaTime;
 	}
 
 }
