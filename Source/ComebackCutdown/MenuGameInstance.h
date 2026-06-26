@@ -40,6 +40,9 @@ public:
 		bool edit2Set;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
 		FVector textureEdit2;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
+		int gamesWon;
 	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
 	//	FVector textureEdit3;
 };
@@ -58,6 +61,15 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player References")
 		TArray<FPlayerDetails> players;
+
+
+	// Time for each round
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GameInstance Settings")
+		float roundTime;
+
+	// Number of rounds
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "GameInstance Settings")
+		int numRounds;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input Mode")
 		bool isDeviceUsedForMultiplePlayers;

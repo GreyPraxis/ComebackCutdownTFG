@@ -20,6 +20,21 @@ public:
 		AComebackCutdownCharacter* player1;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player References")
 		AComebackCutdownCharacter* player2;
+
+
+	// Time for each round
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Gamemode Settings")
+		float roundTime;
+
+	// Number of rounds
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Gamemode Settings")
+		int numRounds;
+
+	// Number of rounds
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Gamemode Settings")
+		bool isTimerActive;
+
+
 };
 
 

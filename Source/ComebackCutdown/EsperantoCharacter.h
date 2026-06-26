@@ -23,6 +23,9 @@ class COMEBACKCUTDOWN_API AEsperantoCharacter : public AComebackCutdownCharacter
 protected: 
 
 
+	//Player used a special attack?
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attacks")
+		int spinCharged;
 	//Saltos
 	//void StartJump();
 	//void StopJump();

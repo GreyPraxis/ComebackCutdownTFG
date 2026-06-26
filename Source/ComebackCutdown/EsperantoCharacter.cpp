@@ -58,10 +58,12 @@ AEsperantoCharacter::AEsperantoCharacter()
 	LastReleaseTime = 0.0f;
 	MinReleaseTime = 0.1f;
 
-	cantMove = false;
-	wasWeakAttackUsed = false;
-	wasNormalAttackUsed = false;
-	canAttack = true;
+	//cantMove = ;
+	//wasWeakAttackUsed = false;
+	//wasNormalAttackUsed = false;
+	//canAttack = true;
+
+	spinCharged = 0;
 }
 
 //void AEsperantoCharacter::AttackWeak() {

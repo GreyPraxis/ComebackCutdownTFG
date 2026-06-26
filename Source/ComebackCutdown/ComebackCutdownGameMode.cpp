@@ -12,4 +12,8 @@ AComebackCutdownGameMode::AComebackCutdownGameMode()
 	{
 		DefaultPawnClass = PlayerPawnBPClass.Class;
 	}
+
+	numRounds = 2;
+	roundTime = 99;
+	isTimerActive = true;
 }

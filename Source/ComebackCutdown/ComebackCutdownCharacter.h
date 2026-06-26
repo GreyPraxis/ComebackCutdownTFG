@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+//#include "MenuGameInstance.h"
 #include "GameFramework/Character.h"
 #include "ComebackCutdownCharacter.generated.h"
 
@@ -31,6 +32,9 @@ enum class ECharacterState : uint8
 	E_Jumping		UMETA(DisplayName = "JUMPING"),
 	E_Block		UMETA(DisplayName = "BLOCKING"),
 	E_Stunned		UMETA(DisplayName = "STUNNED"),
+	E_Counter		UMETA(DisplayName = "COUNTERING"),
+	E_SpMovement		UMETA(DisplayName = "SPECIAL_MOVEMENT"),
+	E_SpMovementAir		UMETA(DisplayName = "AERIAL_SPECIAL_MOVEMENT"),
 	//E_AirBlock		UMETA(DisplayName = "AIR_BLOCKING"),
 	//E_CrouchBlock		UMETA(DisplayName = "CROUCH_BLOCKING"),
 	E_Dead		UMETA(DisplayName = "DEAD")
@@ -214,6 +218,7 @@ protected:
 	UFUNCTION(BlueprintCallable)
 		void StopBlocking();
 
+
 	// Blocking
 	UFUNCTION(BlueprintCallable)
 		void BreakBlock();
@@ -232,6 +237,18 @@ protected:
 	// Move a character off of another hurtbox/collider smoothly
 	UFUNCTION(BlueprintImplementableEvent)
 		void MoveCharacterSmoothly(FVector _start, FVector _end);
+
+
+	UFUNCTION(BlueprintCallable)
+		void WinRound();
+	UFUNCTION(BlueprintCallable)
+		void WinMatch();
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable)
+		void NotifyRoundStart();
+	UFUNCTION(BlueprintImplementableEvent)
+		void NotifyRoundEnd();
+	UFUNCTION(BlueprintImplementableEvent)
+		void UpdateHUDRoundIcons();
 
 
 	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
@@ -269,6 +286,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Jump")
 		float jumpSpeed;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Jump")
+		bool canJumpFromSpecialMove;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sprint")
 		float LastTapTime;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sprint")
@@ -299,6 +319,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stun")
 		float timeStunned;
 
+	// Timer being invulnerable from taking damage
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Buffs")
+		float timeInvulnerable;
+
 	// stunTime from getting the shield hit
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block")
 		float blockStun;
@@ -306,8 +330,20 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block")
 		float blockShieldBreakStunFrames;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Block")
+		bool blockHeld;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
 		bool cantMove;
+
+	//UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ready")
+	//	bool isReadyForEntrance;
+	// 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game Logic")
+		int roundsWon;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animations")
+		bool hasLostRound;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Character")
 		TArray<UStaticMeshComponent*> hurtboxes;

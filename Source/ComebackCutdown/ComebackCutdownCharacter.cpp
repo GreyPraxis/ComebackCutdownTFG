@@ -67,6 +67,8 @@ AComebackCutdownCharacter::AComebackCutdownCharacter()
 	jumpCount = 0;
 	jumpSpeed = 1000.f;
 
+	canJumpFromSpecialMove = false;
+
 	LastTapTime = 0.0f;
 	LastTapDirection = EDirectionalInput::VE_Neutral;
 	DoubleTapThreshold = 0.5f; // segundos
@@ -76,20 +78,22 @@ AComebackCutdownCharacter::AComebackCutdownCharacter()
 	stopRunTime = 0.0f;
 
 
-	timeChargingSpecial = 0.0f;
+	timeChargingStrong = 0.0f;
 	chargingStrong = false;
 	timeChargingSpecial = 0.0f;
 	chargingSpecial = false;
 
 	timeStunned = 0.0f;
 
+	timeInvulnerable = 0.0f;
+
 	blockShieldBreakStunFrames = 150.0f;
 
-	cantMove = false;
+	cantMove = true;
 	wasWeakAttackUsed = false;
 	wasNormalAttackUsed = false;
 	wasSpecialAttackUsed = false;
-	canAttack = true;
+	canAttack = false;
 
 	weakHeld = false;
 	normalHeld = false;
@@ -100,6 +104,10 @@ AComebackCutdownCharacter::AComebackCutdownCharacter()
 
 	timeDirectionalXInputWasHeld = 0.0f;
 	timeDirectionalYInputWasHeld = 0.0f;
+
+	//isReadyForEntrance = false;
+	roundsWon = 0;
+	hasLostRound = false;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -450,8 +458,14 @@ void AComebackCutdownCharacter::Landed(const FHitResult& Hit) {
 			characterState = ECharacterState::E_Idle;
 		}*/
 	}
-
-	characterState = ECharacterState::E_Idle;
+	if (characterState != ECharacterState::E_Stunned && characterState != ECharacterState::E_Block) {
+		if (characterState != ECharacterState::E_SpMovementAir)
+			characterState = ECharacterState::E_Idle;
+		else {
+			characterState = ECharacterState::E_SpMovement;
+			canJumpFromSpecialMove = true;
+		}
+	}
 }
 
 void AComebackCutdownCharacter::StartJump()
@@ -465,7 +479,7 @@ void AComebackCutdownCharacter::StartJump()
 	//	++jumpCount;
 	//}
 	if (!cantMove && characterState != ECharacterState::E_Dead 
-		&& characterState != ECharacterState::E_Stunned) {
+		&& characterState != ECharacterState::E_Stunned && blockStun <= 0) {
 		ACharacter::Jump();
 		characterState = ECharacterState::E_Jumping;
 	}
@@ -494,7 +508,8 @@ void AComebackCutdownCharacter::AttackWeak() {
 	}*/
 	if (characterState != ECharacterState::E_Dead
 		&& characterState != ECharacterState::E_Stunned
-		&& characterState != ECharacterState::E_Block) {
+		&& characterState != ECharacterState::E_Block
+		&& canAttack) {
 		wasWeakAttackUsed = true;
 	}
 
@@ -550,7 +565,8 @@ void AComebackCutdownCharacter::AttackNormal() {
 	}*/
 	if (characterState != ECharacterState::E_Dead
 		&& characterState != ECharacterState::E_Stunned
-		&& characterState != ECharacterState::E_Block) {
+		&& characterState != ECharacterState::E_Block
+		&& canAttack) {
 		wasNormalAttackUsed = true;
 	}
 
@@ -657,13 +673,19 @@ void AComebackCutdownCharacter::AttackSpecialRelease() {
 
 
 void AComebackCutdownCharacter::AttackStrongW() {
-	if (!normalHeld && ((directionalInputLeftRight!=EDirectionalInput::VE_Neutral && timeDirectionalXInputWasHeld < 0.1f) || (directionalInputUpDown != EDirectionalInput::VE_Default && timeDirectionalYInputWasHeld < 0.1f))) {
+	if (!normalHeld && canAttack && characterState != ECharacterState::E_Dead
+		&& characterState != ECharacterState::E_Stunned
+		&& characterState != ECharacterState::E_Block
+		&& ((directionalInputLeftRight!=EDirectionalInput::VE_Neutral && timeDirectionalXInputWasHeld < 0.1f) || (directionalInputUpDown != EDirectionalInput::VE_Default && timeDirectionalYInputWasHeld < 0.1f))) {
 		weakHeld = true;
 		AttackStrong();
 	}
 }
 void AComebackCutdownCharacter::AttackStrongN() {
-	if (!weakHeld && ((directionalInputLeftRight != EDirectionalInput::VE_Neutral && timeDirectionalXInputWasHeld < 0.1f) || (directionalInputUpDown != EDirectionalInput::VE_Default && timeDirectionalYInputWasHeld < 0.1f))) {
+	if (!weakHeld && canAttack && characterState != ECharacterState::E_Dead
+		&& characterState != ECharacterState::E_Stunned
+		&& characterState != ECharacterState::E_Block
+		&& ((directionalInputLeftRight != EDirectionalInput::VE_Neutral && timeDirectionalXInputWasHeld < 0.1f) || (directionalInputUpDown != EDirectionalInput::VE_Default && timeDirectionalYInputWasHeld < 0.1f))) {
 		normalHeld = true;
 		AttackStrong();
 	}
@@ -709,7 +731,9 @@ void AComebackCutdownCharacter::AttackStrongReleaseN() {
 }
 
 void AComebackCutdownCharacter::AttackStrongRelease() {
-	if (weakHeld)
+
+	weakHeld = false;
+	normalHeld = false;
 	UE_LOG(LogTemp, Warning, TEXT("Ataque fuerte"));
 
 	if (chargingStrong){
@@ -722,122 +746,141 @@ void AComebackCutdownCharacter::AttackStrongRelease() {
 
 void AComebackCutdownCharacter::StartBlocking() {
 	if (characterState != ECharacterState::E_Dead
-		&& characterState != ECharacterState::E_Stunned) {
+		&& characterState != ECharacterState::E_Stunned
+		&& characterState != ECharacterState::E_SpMovement
+		&& characterState != ECharacterState::E_SpMovementAir) {
+		blockHeld = true;
 		characterState = ECharacterState::E_Block;
 	}
 }
 
+
 void AComebackCutdownCharacter::StopBlocking() {
 	if (characterState == ECharacterState::E_Block) {
-		characterState = ECharacterState::E_Idle;
+		if (blockStun <= 0)
+			characterState = ECharacterState::E_Idle;
 	}
+
+	blockHeld = false;
 }
 
 
-void AComebackCutdownCharacter::TakeDamage(float _damageAmount, 
+void AComebackCutdownCharacter::TakeDamage(float _damageAmount,
 	float _launch, float _angel,
-	FVector _hitLocation, bool _shouldLaunchMatchCharacterDirection, 
-	float stuntime,	AActor* _instigator) {
+	FVector _hitLocation, bool _shouldLaunchMatchCharacterDirection,
+	float stuntime, AActor* _instigator) {
 	//UE_LOG(LogTemp, Warning, TEXT("Taking damage for %f points."), _damageAmount);
-	
-	if (characterState != ECharacterState::E_Block) {
-		currentPlayerHealth -= _damageAmount;
+	if (characterState != ECharacterState::E_Counter){
+		if (timeInvulnerable <= 0.0f) {
+			if (characterState != ECharacterState::E_Block) {
+				currentPlayerHealth -= _damageAmount;
 
-		if (currentPlayerHealth < 0.0f) currentPlayerHealth = 0.0f;
+				if (currentPlayerHealth < 0.0f) {
+					currentPlayerHealth = 0.0f;
+					otherPlayer->WinRound();
+				}
 
-		timeStunned = stuntime;
-		if (timeStunned > 0) {
-			characterState = ECharacterState::E_Stunned;
-		}
+				timeStunned = stuntime;
+				if (timeStunned > 0) {
+					characterState = ECharacterState::E_Stunned;
+				}
 
-		if (_shouldLaunchMatchCharacterDirection)
-		{
-			// If there is an owner/creator of the hitbox
-			if (_instigator)
-			{
-				//If the owner/creator is a playable character
-				if (AComebackCutdownCharacter* owningCharacter = Cast<AComebackCutdownCharacter>(_instigator))
+				if (_shouldLaunchMatchCharacterDirection)
 				{
-					if (owningCharacter->isFacingRight)
+					// If there is an owner/creator of the hitbox
+					if (_instigator)
 					{
-						HandleLaunch(_launch, acosf((-cosf(_angel)))); // invert x-axis launch angle
+						//If the owner/creator is a playable character
+						if (AComebackCutdownCharacter* owningCharacter = Cast<AComebackCutdownCharacter>(_instigator))
+						{
+							if (owningCharacter->isFacingRight)
+							{
+								HandleLaunch(_launch, atan2f(sinf(_angel), -cosf(_angel))); // invert x-axis launch angle
+							}
+							else
+							{
+								HandleLaunch(_launch, _angel);
+							}
+						}
 					}
 					else
+					{
+						if (!isFacingRight)
+						{
+							HandleLaunch(_launch, _angel);
+						}
+						else
+						{
+							HandleLaunch(_launch, atan2f(sinf(_angel), -cosf(_angel))); // invert x-axis launch angle
+						}
+					}
+				}
+				else
+				{
+					if (GetActorLocation().Y >= _hitLocation.Y)
 					{
 						HandleLaunch(_launch, _angel);
 					}
-				}
-			}
-			else
-			{
-				if (!isFacingRight)
-				{
-					HandleLaunch(_launch, _angel);
-				}
-				else
-				{
-					HandleLaunch(_launch, acosf((-cosf(_angel)))); // invert x-axis launch angle
-				}
-			}
-		}
-		else
-		{
-			if (GetActorLocation().Y >= _hitLocation.Y)
-			{
-				HandleLaunch(_launch, _angel);
-			}
-			else
-			{
-				HandleLaunch(_launch, acosf((-cosf(_angel)))); // invert x-axis launch angle
-			}
-		}
-
-	}
-	else { //If blocking, handle launch only in X axis
-		//(cosf(_angel)*_launch/4) = Launch distance in X / 4
-		blockStun = stuntime / 2;
-		if (_shouldLaunchMatchCharacterDirection)
-		{
-			// If there is an owner/creator of the hitbox
-			if (_instigator)
-			{
-				//If the owner/creator is a playable character
-				if (AComebackCutdownCharacter* owningCharacter = Cast<AComebackCutdownCharacter>(_instigator))
-				{
-					if (owningCharacter->isFacingRight)
+					else
 					{
-						HandleLaunch(cosf(_angel) * _launch / 4, acos(-1.0));// invert x-axis launch angle
+						HandleLaunch(_launch, atan2f(sinf(_angel), -cosf(_angel))); // invert x-axis launch angle
+					}
+				}
+
+			}
+			else { //If blocking, handle launch only in X axis
+				//(cosf(_angel)*_launch/4) = Launch distance in X / 4
+				blockStun = stuntime / 2;
+				if (_shouldLaunchMatchCharacterDirection)
+				{
+					// If there is an owner/creator of the hitbox
+					if (_instigator)
+					{
+						//If the owner/creator is a playable character
+						if (AComebackCutdownCharacter* owningCharacter = Cast<AComebackCutdownCharacter>(_instigator))
+						{
+							if (owningCharacter->isFacingRight)
+							{
+								HandleLaunch(cosf(_angel) * _launch / 4, acos(-1.0));// invert x-axis launch angle
+							}
+							else
+							{
+								HandleLaunch(cosf(_angel) * _launch / 4, 0);
+							}
+						}
 					}
 					else
 					{
-						HandleLaunch(cosf(_angel) * _launch / 4, 0);
+						if (!isFacingRight)
+						{
+							HandleLaunch(cosf(_angel) * _launch / 4, acos(-1.0));
+						}
+						else
+						{
+							HandleLaunch(cosf(_angel) * _launch / 4, 0); // invert x-axis launch angle
+						}
 					}
-				}
-			}
-			else
-			{
-				if (!isFacingRight)
-				{
-					HandleLaunch(cosf(_angel) * _launch / 4, acos(-1.0));
 				}
 				else
 				{
-					HandleLaunch(cosf(_angel) * _launch / 4, 0); // invert x-axis launch angle
+					if (GetActorLocation().Y >= _hitLocation.Y)
+					{
+						HandleLaunch(cosf(_angel) * _launch / 4, acos(-1.0));
+					}
+					else
+					{
+						HandleLaunch(cosf(_angel) * _launch / 4, 0); // invert x-axis launch angle
+					}
 				}
-			}
-		}
-		else
-		{
-			if (GetActorLocation().Y >= _hitLocation.Y)
-			{
-				HandleLaunch(cosf(_angel) * _launch / 4, acos(-1.0));
-			}
-			else
-			{
-				HandleLaunch(cosf(_angel) * _launch / 4, 0); // invert x-axis launch angle
-			}
-		}
 
+			}
+		}
+		else {
+			UE_LOG(LogTemp, Warning, TEXT("Character is untouchable"));
+		}
+	}
+	else {
+		timeInvulnerable = 1.5f;
 	}
 }
 
@@ -856,6 +899,19 @@ void AComebackCutdownCharacter::BreakBlock() {
 	timeStunned = blockShieldBreakStunFrames;
 }
 
+
+void AComebackCutdownCharacter::WinRound() {
+	otherPlayer->hasLostRound = true;
+	++roundsWon;
+	NotifyRoundEnd();
+	UpdateHUDRoundIcons();
+}
+
+void AComebackCutdownCharacter::WinMatch() {
+	cantMove = true;
+	canAttack = false;
+}
+
 void AComebackCutdownCharacter::Tick(float DeltaTime) 
 {
 	Super::Tick(DeltaTime);
@@ -866,6 +922,7 @@ void AComebackCutdownCharacter::Tick(float DeltaTime)
 	}
 	if (blockStun > 0) {
 		blockStun -= DeltaTime;
+		if (!blockHeld && blockStun <= 0) characterState = ECharacterState::E_Idle;
 	}
 	if (timeStunned > 0) {
 		timeStunned -= DeltaTime;
@@ -888,6 +945,10 @@ void AComebackCutdownCharacter::Tick(float DeltaTime)
 	if (directionalInputUpDown != EDirectionalInput::VE_Default)
 	{
 		timeDirectionalYInputWasHeld += DeltaTime;
+	}
+
+	if (timeInvulnerable > 0) {
+		timeInvulnerable -= DeltaTime;
 	}
 
 }
