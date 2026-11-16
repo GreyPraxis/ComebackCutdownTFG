@@ -247,7 +247,7 @@ void AComebackCutdownCharacter::MoveRight(float Value)
 			UE_LOG(LogTemp, Warning, TEXT("ParaCorrer"));
 		}
 		// add movement in that direction
-		if (!cantMove && characterState != ECharacterState::E_Block && characterState != ECharacterState::E_Stunned) {
+		if (!cantMove && characterState != ECharacterState::E_Block && characterState != ECharacterState::E_Stunned && characterState != ECharacterState::E_Crouching) {
 			if (!GetCharacterMovement()->IsFalling()) {
 
 				if (Value > 0.20f) {
@@ -334,7 +334,7 @@ void AComebackCutdownCharacter::MoveRightController(float Value)
 
 		UE_LOG(LogTemp, Warning, TEXT("Moves %f"), Value);
 		// add movement in that direction
-		if (!cantMove && characterState != ECharacterState::E_Block && characterState != ECharacterState::E_Stunned) {
+		if (!cantMove && characterState != ECharacterState::E_Block && characterState != ECharacterState::E_Stunned && characterState != ECharacterState::E_Crouching) {
 			if (!GetCharacterMovement()->IsFalling()) {
 
 				if (Value > 0.20f) {
@@ -773,61 +773,9 @@ void AComebackCutdownCharacter::TakeDamage(float _damageAmount,
 	if (characterState != ECharacterState::E_Counter){
 		if (timeInvulnerable <= 0.0f) {
 			if (characterState != ECharacterState::E_Block) {
-				currentPlayerHealth -= _damageAmount;
-
-				if (currentPlayerHealth < 0.0f) {
-					currentPlayerHealth = 0.0f;
-					otherPlayer->WinRound();
-				}
-
-				timeStunned = stuntime;
-				if (timeStunned > 0) {
-					characterState = ECharacterState::E_Stunned;
-				}
-
-				if (_shouldLaunchMatchCharacterDirection)
-				{
-					// If there is an owner/creator of the hitbox
-					if (_instigator)
-					{
-						//If the owner/creator is a playable character
-						if (AComebackCutdownCharacter* owningCharacter = Cast<AComebackCutdownCharacter>(_instigator))
-						{
-							if (owningCharacter->isFacingRight)
-							{
-								HandleLaunch(_launch, atan2f(sinf(_angel), -cosf(_angel))); // invert x-axis launch angle
-							}
-							else
-							{
-								HandleLaunch(_launch, _angel);
-							}
-						}
-					}
-					else
-					{
-						if (!isFacingRight)
-						{
-							HandleLaunch(_launch, _angel);
-						}
-						else
-						{
-							HandleLaunch(_launch, atan2f(sinf(_angel), -cosf(_angel))); // invert x-axis launch angle
-						}
-					}
-				}
-				else
-				{
-					if (GetActorLocation().Y >= _hitLocation.Y)
-					{
-						HandleLaunch(_launch, _angel);
-					}
-					else
-					{
-						HandleLaunch(_launch, atan2f(sinf(_angel), -cosf(_angel))); // invert x-axis launch angle
-					}
-				}
-
+				damageCalc(_damageAmount, _launch, _angel, _hitLocation, _shouldLaunchMatchCharacterDirection, stuntime, _instigator);
 			}
+
 			else { //If blocking, handle launch only in X axis
 				//(cosf(_angel)*_launch/4) = Launch distance in X / 4
 				blockStun = stuntime / 2;
@@ -881,6 +829,65 @@ void AComebackCutdownCharacter::TakeDamage(float _damageAmount,
 	}
 	else {
 		timeInvulnerable = 1.5f;
+	}
+}
+
+void AComebackCutdownCharacter::damageCalc(float _damageAmount,
+	float _launch, float _angel,
+	FVector _hitLocation, bool _shouldLaunchMatchCharacterDirection,
+	float stuntime, AActor* _instigator) {
+	currentPlayerHealth -= _damageAmount;
+
+	if (currentPlayerHealth <= 0.0f && !hasLostRound) {
+		currentPlayerHealth = 0.0f;
+		otherPlayer->WinRound();
+	}
+
+	timeStunned = stuntime;
+	if (timeStunned > 0) {
+		characterState = ECharacterState::E_Stunned;
+	}
+
+	if (_shouldLaunchMatchCharacterDirection)
+	{
+		// If there is an owner/creator of the hitbox
+		if (_instigator)
+		{
+			//If the owner/creator is a playable character
+			if (AComebackCutdownCharacter* owningCharacter = Cast<AComebackCutdownCharacter>(_instigator))
+			{
+				if (owningCharacter->isFacingRight)
+				{
+					HandleLaunch(_launch, atan2f(sinf(_angel), -cosf(_angel))); // invert x-axis launch angle
+				}
+				else
+				{
+					HandleLaunch(_launch, _angel);
+				}
+			}
+		}
+		else
+		{
+			if (!isFacingRight)
+			{
+				HandleLaunch(_launch, _angel);
+			}
+			else
+			{
+				HandleLaunch(_launch, atan2f(sinf(_angel), -cosf(_angel))); // invert x-axis launch angle
+			}
+		}
+	}
+	else
+	{
+		if (GetActorLocation().Y >= _hitLocation.Y)
+		{
+			HandleLaunch(_launch, _angel);
+		}
+		else
+		{
+			HandleLaunch(_launch, atan2f(sinf(_angel), -cosf(_angel))); // invert x-axis launch angle
+		}
 	}
 }
 

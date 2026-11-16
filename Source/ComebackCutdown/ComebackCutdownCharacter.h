@@ -225,10 +225,15 @@ protected:
 
 	// Damage the character
 	UFUNCTION(BlueprintCallable)
-		void TakeDamage(float _damageAmount, float _launch, float _angel, 
-			FVector _hitLocation = FVector(0.0f, 0.0f, 0.0f), bool _shouldLaunchMatchCharacterDirection = false, 
+		void TakeDamage(float _damageAmount, float _launch, float _angel,
+			FVector _hitLocation = FVector(0.0f, 0.0f, 0.0f), bool _shouldLaunchMatchCharacterDirection = false,
 			float stunTime = 0.0f,
 			AActor* _instigator = nullptr);
+
+	void damageCalc(float _damageAmount, float _launch, float _angel,
+		FVector _hitLocation = FVector(0.0f, 0.0f, 0.0f), bool _shouldLaunchMatchCharacterDirection = false,
+		float stunTime = 0.0f,
+		AActor* _instigator = nullptr);
 
 	// Knockback the character in a direction
 	UFUNCTION(BlueprintCallable)

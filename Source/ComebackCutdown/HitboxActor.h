@@ -11,7 +11,8 @@ UENUM(BlueprintType)
 enum class EHitboxEnum : uint8
 {
 	HB_STRIKE		UMETA(DisplayName = "Strike"),
-	HB_HURTBOX		UMETA(DisplayName = "Hurtbox")
+	HB_HURTBOX		UMETA(DisplayName = "Hurtbox"),
+	HB_PROJECTILE	UMETA(DisplayName = "Projectile")
 };
 
 UENUM(BlueprintType)
